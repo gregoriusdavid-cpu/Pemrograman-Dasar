@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Scarecrow Monitoring System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #121212; color: white; margin: 0; padding: 20px; }
+        .header { text-align: center; padding-bottom: 20px; border-bottom: 1px solid #333; }
+        .main-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: #2a2a2a; padding: 15px; border-radius: 10px; text-align: center; }
+        .stat-box h4 { margin: 0; color: #aaa; font-size: 14px; }
+        .stat-box p { margin: 10px 0 0; font-size: 24px; font-weight: bold; }
+        .on { color: #ff4d4d; }
+        .off { color: #4dff88; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th { background: #333; color: #007bff; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #333; }
+        tr:hover { background: #252525; }
+        
+        .chart-container { position: relative; height: 250px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>SCARECROW REAL-TIME MONITOR</h1>
+        <p>Status Hardware: <span id="master-status">CONNECTING...</span></p>
+    </div>
+
+    <div class="main-container">
+        <div class="left-col">
+            <div class="card">
+                <h3>Live Status</h3>
+                <div class="status-grid">
+                    <div class="stat-box">
+                        <h4>JARAK</h4>
+                        <p><span id="live-dist">0</span> cm</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>PIR (GERAK)</h4>
+                        <p id="live-pir">Aman</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>SUDUT SERVO</h4>
+                        <p><span id="live-angle">0</span>°</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>BUZZER/LED</h4>
+                        <p id="live-alert">OFF</p>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="liveChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-col">
+            <div class="card">
+                <h3>Log History (MySQL - Update per Menit)</h3>
+                <div id="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>PIR</th>
+                                <th>Ultrasonic</th>
+                                <th>Waktu</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inisialisasi Grafik
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const liveChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Jarak (cm)',
+                    data: Array(20).fill(0),
+                    borderColor: '#007bff',
+                    tension: 0.3,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)'
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, animation: false }
+        });
+
+        function fetchData() {
+            fetch('/data')
+                .then(res => res.json())
+                .then(data => {
+                    // 1. Update Live UI (Update setiap detik)
+                    document.getElementById('live-dist').innerText = data.live.distance;
+                    document.getElementById('live-angle').innerText = data.live.angle;
+                    
+                    const pir = document.getElementById('live-pir');
+                    pir.innerText = data.live.motion ? "ADA GERAKAN!" : "Aman";
+                    pir.className = data.live.motion ? "on" : "off";
+
+                    const alert = document.getElementById('live-alert');
+                    alert.innerText = data.live.status;
+                    alert.className = data.live.status === "ON" ? "on" : "off";
+                    
+                    document.getElementById('master-status').innerText = "ACTIVE";
+
+                    // 2. Update Chart
+                    liveChart.data.datasets[0].data.push(data.live.distance);
+                    liveChart.data.datasets[0].data.shift();
+                    liveChart.update();
+
+                    // 3. Update Tabel dari MySQL (Menggunakan nama kolom tabel)
+                    const tbody = document.getElementById('log-table-body');
+                    tbody.innerHTML = ''; 
+                    data.logs.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.no}</td>
+                            <td class="${row.pear ? 'on' : ''}">${row.pear ? 'DETEKSI' : 'AMAN'}</td>
+                            <td>${row.ultrasonic} cm</td>
+                            <td>${row.tanggal}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('master-status').innerText = "DISCONNECTED";
+                });
+        }
+
+        // Jalankan fetch setiap 1 detik
+        setInterval(fetchData, 1000);
+    </script>
+</body>
+</html>
