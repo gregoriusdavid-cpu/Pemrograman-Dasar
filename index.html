@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Scarecrow Real-Time Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: white; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: #2d2d2d; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #444; }
+        .card h3 { margin: 0; color: #007bff; font-size: 0.9em; }
+        .card p { font-size: 2em; margin: 10px 0 0; font-weight: bold; }
+        .on { color: #ff4d4d; }
+        .off { color: #4dff88; }
+        .chart-box { background: #2d2d2d; padding: 20px; border-radius: 12px; height: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center;">🛰️ Scarecrow Monitor</h1>
+        <p style="text-align: center; color: #888;">Status Jaringan: <span id="net-status" style="color: yellow;">Menghubungkan...</span></p>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>JARAK SCAN</h3>
+                <p><span id="dist-val">0</span> <small style="font-size: 0.5em;">cm</small></p>
+            </div>
+            <div class="card">
+                <h3>SUDUT SERVO</h3>
+                <p><span id="angle-val">0</span>°</p>
+            </div>
+            <div class="card">
+                <h3>SENSOR PIR</h3>
+                <p id="pir-val">--</p>
+            </div>
+            <div class="card">
+                <h3>BUZZER / LED</h3>
+                <p id="alert-val">OFF</p>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <canvas id="distChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Setup Grafik Jarak
+        const ctx = document.getElementById('distChart').getContext('2d');
+        const distChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Jarak (cm)',
+                    data: Array(20).fill(0),
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                animation: false,
+                scales: { y: { min: 0, max: 200, grid: { color: '#444' } } }
+            }
+        });
+
+        function updateUI() {
+            fetch('/data')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('dist-val').innerText = data.distance;
+                    document.getElementById('angle-val').innerText = data.angle;
+                    
+                    const pir = document.getElementById('pir-val');
+                    pir.innerText = data.motion ? "GERAK!" : "AMAN";
+                    pir.className = data.motion ? "on" : "off";
+
+                    const alert = document.getElementById('alert-val');
+                    alert.innerText = data.status;
+                    alert.className = data.status === "ON" ? "on" : "off";
+
+                    document.getElementById('net-status').innerText = "ONLINE";
+                    document.getElementById('net-status').style.color = "#4dff88";
+
+                    // Update Chart
+                    distChart.data.datasets[0].data.push(data.distance);
+                    distChart.data.datasets[0].data.shift();
+                    distChart.update();
+                })
+                .catch(err => {
+                    document.getElementById('net-status').innerText = "OFFLINE";
+                    document.getElementById('net-status').style.color = "red";
+                });
+        }
+
+        setInterval(updateUI, 800); // Update setiap 0.8 detik
+    </script>
+</body>
+</html>
