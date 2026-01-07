@@ -1,0 +1,10 @@
+CREATE DATABASE log_history_scarecrow;
+USE log_history_scarecrow;
+
+CREATE TABLE riwayat_scarecrow (
+    no INT(20) NOT NULL AUTO_INCREMENT,
+    pear INT(20),
+    ultrasonic INT(20),
+    tanggal DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (no)
+);
